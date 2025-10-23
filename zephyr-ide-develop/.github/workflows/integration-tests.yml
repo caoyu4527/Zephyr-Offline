@@ -1,0 +1,74 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, pre-release, develop]
+  pull_request:
+    branches: [main, pre-release, develop]
+
+jobs:
+  test-with-zephyr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip python3-venv cmake ninja-build gperf \
+            ccache dfu-util device-tree-compiler wget file make gcc gcc-multilib \
+            g++-multilib libsdl2-dev libmagic1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run test-compile
+
+      - name: Bundle Extension (dist)
+        run: npm run esbuild
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run external zephyr workspace integration tests
+        run: |
+          xvfb-run -a node scripts/run-integration-tests.js external-zephyr
+        env:
+          NODE_ENV: test
+          ZEPHYR_BASE: /tmp/zephyr
+
+      - name: Run standard workflow integration tests
+        run: |
+          xvfb-run -a node scripts/run-integration-tests.js standard
+        env:
+          NODE_ENV: test
+          ZEPHYR_BASE: /tmp/zephyr
+
+      - name: Run west git workflow integration tests
+        run: |
+          xvfb-run -a node scripts/run-integration-tests.js west-git
+        env:
+          NODE_ENV: test
+          ZEPHYR_BASE: /tmp/zephyr
+
+      - name: Run zephyr ide git workspace integration tests
+        run: |
+          xvfb-run -a node scripts/run-integration-tests.js zephyr-ide-git
+        env:
+          NODE_ENV: test
+          ZEPHYR_BASE: /tmp/zephyr
+
+      - name: Run local west workspace integration tests
+        run: |
+          xvfb-run -a node scripts/run-integration-tests.js local-west
+        env:
+          NODE_ENV: test
+          ZEPHYR_BASE: /tmp/zephyr
